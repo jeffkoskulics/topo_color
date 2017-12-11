@@ -1,0 +1,89 @@
+%function [s sx sy] = slope_histogram(z)
+
+%compute surface normals
+[u_sn, r_sn] = surface_normals(z);
+
+%x-component of slope
+ sx = reshape(u_sn(:,:,1)./u_sn(:,:,3),numel(u_sn(:,:,1)),1);
+%y-component of slope
+ sy = reshape(u_sn(:,:,2)./u_sn(:,:,3),numel(u_sn(:,:,1)),1);
+%slope magnitude
+ s = (sx.^2 +sy.^2).^0.5;
+ 
+ %Set up histogram bins
+ max_x_slope = 0.5774;
+ min_x_slope = -0.5774;
+ num_x_bins = 100;
+ max_y_slope = 0.5774;
+ min_y_slope = -0.5774;
+ num_y_bins = 100;
+ x_bins = linspace(min_x_slope,max_x_slope,num_x_bins);
+ y_bins = linspace(min_y_slope,max_y_slope,num_y_bins);
+ 
+ %Allocate space for the histogram
+ S = zeros(length(y_bins),length(x_bins));
+ 
+ %Calculate x- and y-bins for all data points
+ row_index = round((sy-y_bins(1))/(y_bins(2)-y_bins(1)))+1;
+ col_index = round((sx-x_bins(1))/(x_bins(2)-x_bins(1)))+1;
+ 
+ %Add each data point to its appropriate histogram bin
+ for i = 1:length(row_index)
+     if ((0 < row_index(i) && row_index(i) <= num_y_bins) && ...
+             (0 < col_index(i) && col_index(i) <= num_x_bins))
+        S(row_index(i),col_index(i)) = S(row_index(i),col_index(i)) +1; 
+     end
+ end
+ 
+%Plot the histogram
+imagesc(S)
+C = colormap('bone');
+num_colors = size(C,1);
+colormap(C(num_colors:-1:1,:))
+
+%Set the axes ticks
+num_x_ticks = 9;
+num_y_ticks = 5;
+x_tick_labels = linspace(min_x_slope,max_x_slope,num_x_ticks);
+y_tick_labels = linspace(min_y_slope,max_y_slope,num_y_ticks);
+
+x_tick_locations = (0:length(x_tick_labels)-1)*(length(x_bins)/(length(x_tick_labels)-1))+0.5;
+y_tick_locations = (0:length(y_tick_labels)-1)*(length(y_bins)/(length(y_tick_labels)-1))+0.5;
+
+set(gca,'XTick',x_tick_locations);
+set(gca,'YTick',y_tick_locations);
+set(gca,'XTickLabel',round(atan(x_tick_labels)*180/pi));
+set(gca,'YTickLabel',round(atan(y_tick_labels)*180/pi));
+set(gca,'DataAspectRatio',[max_y_slope - min_y_slope, max_x_slope - min_x_slope, 1]);
+
+%Cox-Munk contour lines
+%x_slopes are upwind
+%y_slopes are crosswind
+x_slopes = x_bins(2:length(x_bins))/2+x_bins(1:length(x_bins)-1)/2;
+y_slopes = y_bins(2:length(y_bins))/2+y_bins(1:length(y_bins)-1)/2;
+wind_speed = 4;
+scr = (0.003+1.92*10^-3*wind_speed)^(1/2);
+sup = (0.000+3.16*10^-3*wind_speed)^(1/2);
+c21 = 0.00;
+c03 = 0.02;
+c40 = 0.40;
+c22 = 0.12;
+c04 = 0.23;
+x = x_slopes / scr;
+y = y_slopes / sup;
+x_bin_width = x(2) - x(1);
+y_bin_width = y(2) - y(1);
+
+p = zeros(num_x_bins,num_y_bins);
+
+for i = 1:num_x_bins-1
+    for j = 1:num_y_bins-1
+        p(i,j) = (2*pi*scr*sup)^-1*exp(-0.5*(x(i)^2 + y(j)^2))*(...
+            1 - 0.5*c21*(x(i)^2-1)*y(j) - (1/6)*c03*(y(j)^3-3*y(j))+...
+            (1/24)*c40*(x(i)^4-6*x(i)^2+3)+(1/4)*c22*(x(i)^2-1)*(y(j)^2-1)+...
+            (1/24)*c04*(y(j)^4-6*y(j)^2+3))*x_bin_width*y_bin_width;
+    end
+end
+
+hold on
+contour(p,10,'color','red')
